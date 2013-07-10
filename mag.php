@@ -48,6 +48,13 @@ class CFTP_Magnificent {
 	var $version;
 
 	/**
+	 * The permalink structure for an article
+	 *
+	 * @var string
+	 **/
+	var $article_permalink_structure;
+
+	/**
 	 * Singleton stuff.
 	 * 
 	 * @access @static
@@ -72,9 +79,16 @@ class CFTP_Magnificent {
 	public function __construct() {
 		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
 		add_action( 'init', array( $this, 'action_init' ) );
+		add_action( 'p2p_created_connection', array( $this, 'action_p2p_created_connection' ) );
+		add_action( 'p2p_delete_connections', array( $this, 'action_p2p_delete_connections' ) );
 		add_filter( 'page_row_actions', array( $this, 'filter_page_row_actions' ), 10, 2 );
+		add_filter( 'post_type_link', array( $this, 'filter_post_type_link' ), 10, 2 );
+		add_filter( 'posts_clauses', array( $this, 'filter_posts_clauses' ), 10, 2 );
+		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
 
-		$this->version = 1;
+
+		$this->version = 2;
+		$this->article_permalink_structure = '/issue/%issue%/%article%/';
 	}
 
 	// HOOKS
@@ -170,6 +184,9 @@ class CFTP_Magnificent {
 			'enter_title_here' => 'Article title',
 		) );
 
+		add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_parent_name=$matches[1]&article=$matches[2]', 'top' );
+
+
 		$article_type = register_extended_taxonomy( 'article_type', 'article', array(
 			'meta_box' => 'radio',
 			'capabilities' => array(
@@ -196,6 +213,8 @@ class CFTP_Magnificent {
 		) );
 		// @TODO: Change the connection creation logo from "+ Create connections" to "Associate with an issue" and "Add articles to this issue"
 
+
+
 	}
 
 	/**
@@ -209,9 +228,111 @@ class CFTP_Magnificent {
 	 * @return array The actions
 	 * @author Simon Wheatley
 	 **/
-	function filter_page_row_actions( $actions, $post ) {
+	public function filter_page_row_actions( $actions, $post ) {
 		// @TODO: Add a row action to view all articles in the Articles list table
 		return $actions;
+	}
+
+	/**
+	 * Hooks the WP redirect_canonical filter to stop project and
+	 * event URLs from redirecting.
+	 *
+	 * @param string $redirect_url The redirected URL
+	 * @param string $requested_url The requested URL
+	 * @return string The URL to redirect to
+	 * @author Simon Wheatley
+	 **/
+	public function filter_redirect_canonical( $redirect_url, $requested_url ) {
+		// If this isn't a 404, send back the redirect URL
+		if ( ! is_404() )
+			return $redirect_url;
+
+		if ( in_array( get_query_var( 'post_type' ), array( 'issue', 'article' ) ) )
+			return $requested_url;
+			
+		return $redirect_url;
+	}
+
+	/**
+	 * Hooks the WP query_vars filter to add various of our geo
+	 * search specific query_vars.
+	 *
+	 * @param array $query_vars An array of the public query vars 
+	 * @return array An array of the public query vars
+	 * @author Simon Wheatley
+	 **/
+	public function filter_query_vars( $query_vars ) {
+		return array_merge( $query_vars, array( 'post_parent_name' ) );
+	}
+
+	/**
+	 * Amend the WHERE clause to additionally search for our post_parent_name
+	 * query variable. This allows our fancy article URLs to work.
+	 *
+	 * @param array $clauses An array of SQL clauses from WP_Query
+	 * @param object $query A WP_Query object 
+	 * @return array An array of SQL clauses from WP_Query
+	 * @author Simon Wheatley
+	 **/
+	public function filter_posts_clauses( $clauses, $query ) {
+		global $wpdb;
+		if ( ! $post_parent_name = $query->get( 'post_parent_name' ) )
+			return $clauses;
+		$sql = " AND $wpdb->posts.post_parent IN ( SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'issue' AND post_status = 'publish' ) ";
+		$clauses[ 'where' ] .= $wpdb->prepare( $sql, $post_parent_name );
+		return $clauses;
+	}
+
+	/**
+	 * Hooks the WP post_type_link filter to provide a permalink for articles.
+	 *
+	 * @param string $permalink The currently constructed permalink 
+	 * @param int $post_id The ID of the WP Post that the permalink is for
+	 * @return string The currently constructed permalink 
+	 * @author Simon Wheatley
+	 **/
+	public function filter_post_type_link( $permalink, $post_id ) {
+		global $wp_rewrite;
+		if ( ! is_object( $wp_rewrite ) || ! $wp_rewrite->using_permalinks() )
+			return $permalink;
+		$post = get_post( $post_id );
+		if ( 'issue' == $post->post_type ) {
+			// @TODO: Remove the below code if unnecessary
+			// $permalink = home_url() . str_replace( '%issue%', $post->post_name, $this->issue_permalink_structure );
+		} elseif ( 'event' == $post->post_type ) {
+			$parent = get_post( $post->post_parent );
+			$permalink = home_url() . str_replace( array( '%issue%', '%article%' ), array( $parent->post_name, $post->post_name ), $this->article_permalink_structure );
+		}
+		return $permalink;
+	}
+
+	/**
+	 * Hooks the P2P action p2p_created_connection when a connection is created
+	 *
+	 * @action p2p_created_connection
+	 *
+	 * @param int $p2p_id A P2P connection ID
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	function action_p2p_created_connection( $p2p_id ) {
+		error_log( "SW: Created a connection ID " . print_r( $p2p_id , true ) );
+		// @TODO: Set post_parent for any articles
+	}
+
+	/**
+	 * Hooks the P2P action p2p_delete_connections when connection(s) are deleted
+	 *
+	 * @action p2p_delete_connections
+	 *
+	 * @param array $p2p_ids An array of P2P connection IDs as integers
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	function action_p2p_delete_connections( $p2p_ids ) {
+		foreach ( $p2p_ids as $p2p_id )
+			error_log( "SW: Deleted a connection ID " . print_r( $p2p_id , true ) );
+		// @TODO: Remove post_parent for any now orphaned articles
 	}
 
 	// CALLBACKS
@@ -286,14 +407,15 @@ class CFTP_Magnificent {
 		if ( $version == $this->version )
 			return;
 
-		// if ( $version < 1 ) {
-		// 	error_log( ": …" );
-		// }
+		if ( $version < 2 ) {
+			flush_rewrite_rules();
+			error_log( "CFTP Magnificent: Flush rewrite rules" );
+		}
 
 		// N.B. Remember to increment $this->version above when you add a new IF
 
 		update_option( $option_name, $this->version );
-		error_log( ": Done upgrade, now at version " . $this->version );
+		error_log( "CFTP Magnificent: Done upgrade, now at version " . $this->version );
 	}
 }
 
