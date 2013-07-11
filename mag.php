@@ -9,7 +9,7 @@ Author: Code for the People Ltd
 Author URI: http://codeforthepeople.com/
 */
  
-/*  Copyright 2012 Code for the People Ltd
+/*  Copyright 2013 Code for the People Ltd
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
