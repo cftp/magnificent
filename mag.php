@@ -293,7 +293,7 @@ class CFTP_Magnificent {
 		if ( 'issue' == $post->post_type ) {
 			// @TODO: Remove the below code if unnecessary
 			// $permalink = home_url() . str_replace( '%issue%', $post->post_name, $this->issue_permalink_structure );
-		} elseif ( 'event' == $post->post_type ) {
+		} elseif ( 'article' == $post->post_type ) {
 			$parent = get_post( $post->post_parent );
 			$permalink = home_url() . str_replace( array( '%issue%', '%article%' ), array( $parent->post_name, $post->post_name ), $this->article_permalink_structure );
 		}
