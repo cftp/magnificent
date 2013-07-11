@@ -117,9 +117,6 @@ class CFTP_Magnificent {
 	function action_init() {
 
 		$issue = register_extended_post_type( 'issue', array(
-			'supports' => array(
-				'title', 'author', 'thumbnail'
-			),
 			'capability_type' => 'cftp_magnificent',
 			'map_meta_cap' => true,
 			'cols' => array(
@@ -156,9 +153,6 @@ class CFTP_Magnificent {
 		) );
 
 		$article = register_extended_post_type( 'article', array(
-			'supports' => array(
-				'title', 'author', 'thumbnail'
-			),
 			'capability_type' => 'cftp_magnificent',
 			'map_meta_cap' => true,
 			'cols' => array(
