@@ -87,8 +87,11 @@ class CFTP_Magnificent {
 		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
 
 
-		$this->version = 2;
-		$this->article_permalink_structure = '/issue/%issue%/%article%/';
+		$this->version = 3;
+
+		if ( ! is_a( $GLOBALS['wp_rewrite'], 'WP_Rewrite' ) )
+			$GLOBALS['wp_rewrite'] = new WP_Rewrite();
+		$this->article_permalink_structure = '/' . $GLOBALS['wp_rewrite']->root . 'issue/%issue%/%article%/';
 	}
 
 	// HOOKS
