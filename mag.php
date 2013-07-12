@@ -410,7 +410,7 @@ class CFTP_Magnificent {
 		if ( $version == $this->version )
 			return;
 
-		if ( $version < 2 ) {
+		if ( $version < 3 ) {
 			flush_rewrite_rules();
 			error_log( "CFTP Magnificent: Flush rewrite rules" );
 		}
