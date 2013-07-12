@@ -120,7 +120,7 @@ class CFTP_Magnificent {
 	function action_init() {
 
 		$issue = register_extended_post_type( 'issue', array(
-			'capability_type' => 'cftp_magnificent',
+			// 'capability_type' => 'cftp_mag_item',
 			'map_meta_cap' => true,
 			'cols' => array(
 				'cover' => array(
@@ -155,8 +155,12 @@ class CFTP_Magnificent {
 			),
 		) );
 
+		// $issue_pto = get_post_type_object( 'issue' );
+		// var_dump( $issue_pto ); exit;
+		
+
 		$article = register_extended_post_type( 'article', array(
-			'capability_type' => 'cftp_magnificent',
+			// 'capability_type' => 'cftp_mag_item',
 			'map_meta_cap' => true,
 			'cols' => array(
 				'title' => array(
