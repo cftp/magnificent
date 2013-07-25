@@ -4,7 +4,7 @@
 Plugin Name: Magnificent
 Plugin URI: http://github.com/cftp/magnificent/
 Description: A plugin to implement an issues and articles structure outside traditional WordPress posts
-Version: 0.2
+Version: 0.3
 Author: Code for the People Ltd
 Author URI: http://codeforthepeople.com/
 */
@@ -136,7 +136,7 @@ class CFTP_Magnificent {
 				),
 			),
 			'right_now' => true,
-			// 'menu_icon' => $this->plugin_url( '/imgs/icon.png' ),
+			'menu_position' => 74,
 			'filters' => array(
 				'issue_type' => array(
 					'title'    => 'Type',
@@ -166,6 +166,7 @@ class CFTP_Magnificent {
 		$article = register_extended_post_type( 'article', array(
 			// 'capability_type' => 'cftp_mag_item',
 			'map_meta_cap' => true,
+			'menu_position' => 73,
 			'cols' => array(
 				'title' => array(
 					'title' => 'Issue'
@@ -178,7 +179,6 @@ class CFTP_Magnificent {
 				),
 			),
 			'right_now' => true,
-			// 'menu_icon' => $this->plugin_url( '/imgs/icon.png' ),
 			'filters' => array(
 				'issue_type' => array(
 					'title'    => 'Type',
@@ -217,8 +217,6 @@ class CFTP_Magnificent {
 			'cardinality' => 'many-to-one',
 		) );
 		// @TODO: Change the connection creation logo from "+ Create connections" to "Associate with an issue" and "Add articles to this issue"
-
-
 
 	}
 
@@ -429,3 +427,5 @@ class CFTP_Magnificent {
 
 // Initiate the singleton
 CFTP_Magnificent::init();
+
+
