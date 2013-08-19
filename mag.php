@@ -55,6 +55,13 @@ class CFTP_Magnificent {
 	var $article_permalink_structure;
 
 	/**
+	 * A boolean flag to indicate recursion.
+	 *
+	 * @var boolean
+	 **/
+	var $recursing;
+
+	/**
 	 * Singleton stuff.
 	 * 
 	 * @access @static
@@ -79,6 +86,7 @@ class CFTP_Magnificent {
 	public function __construct() {
 		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
 		add_action( 'init', array( $this, 'action_init' ) );
+		add_action( 'save_post', array( $this, 'action_save_post' ), 10, 2 );
 		add_action( 'p2p_created_connection', array( $this, 'action_p2p_created_connection' ) );
 		add_action( 'p2p_delete_connections', array( $this, 'action_p2p_delete_connections' ) );
 		add_filter( 'page_row_actions', array( $this, 'filter_page_row_actions' ), 10, 2 );
@@ -92,6 +100,7 @@ class CFTP_Magnificent {
 		if ( ! is_a( $GLOBALS['wp_rewrite'], 'WP_Rewrite' ) )
 			$GLOBALS['wp_rewrite'] = new WP_Rewrite();
 		$this->article_permalink_structure = '/' . $GLOBALS['wp_rewrite']->root . 'issue/%issue%/%article%/';
+		$this->recursing = false;
 	}
 
 	// HOOKS
@@ -185,6 +194,9 @@ class CFTP_Magnificent {
 					'taxonomy' => 'issue_type',
 				),
 			),
+			'labels' => array(
+				'parent_item_colon' => 'From Issue:',
+			),
 			'supports' => array( 'title', 'editor', 'thumbnail' ),
 			'enter_title_here' => 'Article title',
 		) );
@@ -202,7 +214,7 @@ class CFTP_Magnificent {
 		$article->add_taxonomy( 'category' );
 
 		p2p_register_connection_type( array(
-			'name'  => 'Issue',
+			'name'  => 'issue_to_article',
 			'from'  => 'article',
 			'to'    => 'issue',
 			'can_create_post' => false,
@@ -218,6 +230,36 @@ class CFTP_Magnificent {
 		) );
 		// @TODO: Change the connection creation logo from "+ Create connections" to "Associate with an issue" and "Add articles to this issue"
 
+	}
+
+	/**
+	 * Hooks the WP action save_post
+	 *
+	 * @action save_post
+	 * @param $post_id
+	 * @param $post
+	 *
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	function action_save_post( $post_id, $post ) {
+		if ( $this->recursing )
+			return;
+		$this->recursing = true;
+		// Get any connected issue and set it as the article post_parent
+		$issues = new WP_Query( array(
+			'connected_type' => 'issue_to_article',
+			'connected_items' => $post->ID,
+			'posts_per_page' => 1,
+		) );
+		if ( $issues->have_posts() ) {
+			$post_data = array(
+				'ID'          => $post_id,
+				'post_parent' => $issues->posts[ 0 ]->ID,
+			);
+			wp_update_post( $post_data );
+		}
+		$this->recursing = false;
 	}
 
 	/**
@@ -303,8 +345,13 @@ class CFTP_Magnificent {
 			// @TODO: Remove the below code if unnecessary
 			// $permalink = home_url() . str_replace( '%issue%', $post->post_name, $this->issue_permalink_structure );
 		} elseif ( 'article' == $post->post_type ) {
-			if ( $parent = get_post( $post->post_parent ) )
-				$permalink = home_url( str_replace( array( '%issue%', '%article%' ), array( $parent->post_name, $post->post_name ), $this->article_permalink_structure ) );
+			$issues = new WP_Query( array(
+				'connected_type' => 'issue_to_article',
+				'connected_items' => $post->ID,
+				'posts_per_page' => 1,
+			) );
+			if ( $issues->have_posts() ) 
+				$permalink = home_url( str_replace( array( '%issue%', '%article%' ), array( $issues->posts[ 0 ]->post_name, $post->post_name ), $this->article_permalink_structure ) );
 			else 
 				$permalink = '';
 		}
