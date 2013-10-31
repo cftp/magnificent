@@ -4,7 +4,7 @@
 Plugin Name: Magnificent
 Plugin URI: http://github.com/cftp/magnificent/
 Description: A plugin to implement an issues and articles structure outside traditional WordPress posts
-Version: 0.3
+Version: 0.4
 Author: Code for the People Ltd
 Author URI: http://codeforthepeople.com/
 */
@@ -93,6 +93,7 @@ class CFTP_Magnificent {
 		add_filter( 'post_type_link', array( $this, 'filter_post_type_link' ), 10, 2 );
 		add_filter( 'posts_clauses', array( $this, 'filter_posts_clauses' ), 10, 2 );
 		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
+		add_filter( 'coauthors_supported_post_types', array( $this, 'filter_coauthors_supported_post_types' ) );
 
 
 		$this->version = 3;
@@ -180,6 +181,7 @@ class CFTP_Magnificent {
 				'title' => array(
 					'title' => 'Issue'
 				),
+				'author',
 				'article_type' => array(
 					'title' => 'Type'
 				),
@@ -230,6 +232,20 @@ class CFTP_Magnificent {
 		) );
 		// @TODO: Change the connection creation logo from "+ Create connections" to "Associate with an issue" and "Add articles to this issue"
 
+	}
+
+	/**
+	 * Hooks the WP filter coauthors_supported_post_types
+	 *
+	 * @filter coauthors_supported_post_types
+	 * @param $post_types
+	 *
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	function filter_coauthors_supported_post_types( $post_types ) {
+		$post_types[] = 'article';
+		return $post_types;
 	}
 
 	/**
@@ -341,19 +357,13 @@ class CFTP_Magnificent {
 		if ( ! is_object( $wp_rewrite ) || ! $wp_rewrite->using_permalinks() )
 			return $permalink;
 		$post = get_post( $post_id );
-		if ( 'issue' == $post->post_type ) {
-			// @TODO: Remove the below code if unnecessary
-			// $permalink = home_url() . str_replace( '%issue%', $post->post_name, $this->issue_permalink_structure );
-		} elseif ( 'article' == $post->post_type ) {
-			$issues = new WP_Query( array(
-				'connected_type' => 'issue_to_article',
-				'connected_items' => $post->ID,
-				'posts_per_page' => 1,
-			) );
-			if ( $issues->have_posts() ) 
-				$permalink = home_url( str_replace( array( '%issue%', '%article%' ), array( $issues->posts[ 0 ]->post_name, $post->post_name ), $this->article_permalink_structure ) );
-			else 
+		if ( 'article' == $post->post_type ) {
+			if ( $post->post_parent ) {
+				$parent = get_post( $post->post_parent );
+				$permalink = home_url( str_replace( array( '%issue%', '%article%' ), array( $parent->post_name, $post->post_name ), $this->article_permalink_structure ) );
+			} else {
 				$permalink = '';
+			}
 		}
 		return $permalink;
 	}
@@ -368,7 +378,6 @@ class CFTP_Magnificent {
 	 * @author Simon Wheatley
 	 **/
 	function action_p2p_created_connection( $p2p_id ) {
-		error_log( "SW: Created a connection ID " . print_r( $p2p_id , true ) );
 		// @TODO: Set post_parent for any articles
 	}
 
@@ -382,13 +391,22 @@ class CFTP_Magnificent {
 	 * @author Simon Wheatley
 	 **/
 	function action_p2p_delete_connections( $p2p_ids ) {
-		foreach ( $p2p_ids as $p2p_id )
-			error_log( "SW: Deleted a connection ID " . print_r( $p2p_id , true ) );
 		// @TODO: Remove post_parent for any now orphaned articles
 	}
 
 	// CALLBACKS
 	// =========
+
+	/**
+	 * 
+	 *
+	 *
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function callback_col_post_author(  ) {
+		var_dump( func_get_args( ) );
+	}
 
 	// UTILITIES
 	// =========
