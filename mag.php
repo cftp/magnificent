@@ -140,7 +140,7 @@ class CFTP_Magnificent {
 				),
 			),
 			'right_now' => true,
-			'menu_position' => 74,
+			'menu_position' => 54,
 			'filters' => array(
 				'issue_type' => array(
 					'title'    => 'Type',
@@ -170,7 +170,7 @@ class CFTP_Magnificent {
 		$article = register_extended_post_type( 'article', array(
 			// 'capability_type' => 'cftp_mag_item',
 			'map_meta_cap' => true,
-			'menu_position' => 73,
+			'menu_position' => 53,
 			'cols' => array(
 				'title' => array(
 					'title' => 'Issue'
