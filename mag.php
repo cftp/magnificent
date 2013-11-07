@@ -4,7 +4,7 @@
 Plugin Name: Magnificent
 Plugin URI: http://github.com/cftp/magnificent/
 Description: A plugin to implement an issues and articles structure outside traditional WordPress posts
-Version: 0.4
+Version: 0.5
 Author: Code for the People Ltd
 Author URI: http://codeforthepeople.com/
 */
@@ -26,12 +26,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
-
-if ( ! class_exists( 'ExtendedCPT' ) )
-	require_once( dirname( __FILE__ ) . '/inc/extended-cpts.php' );
-if ( ! class_exists( 'ExtendedTaxonomy' ) )
-	require_once( dirname( __FILE__ ) . '/inc/extended-taxos.php' );
-
 
 /**
  * Define the data structures.
