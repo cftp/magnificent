@@ -163,9 +163,7 @@ class CFTP_Magnificent {
 			),
 		) );
 
-		// $issue_pto = get_post_type_object( 'issue' );
-		// var_dump( $issue_pto ); exit;
-		
+		do_action( 'mag_registered_issue', $article );
 
 		$article = register_extended_post_type( 'article', array(
 			// 'capability_type' => 'cftp_mag_item',
@@ -207,7 +205,7 @@ class CFTP_Magnificent {
 			),
 		) );
 
-		$article->add_taxonomy( 'category' );
+		do_action( 'mag_registered_article', $article );
 
 		p2p_register_connection_type( array(
 			'name'  => 'issue_to_article',
