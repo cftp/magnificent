@@ -142,13 +142,13 @@ class CFTP_Magnificent {
 			'menu_position' => 54,
 			'filters' => array(
 				'issue_type' => array(
-					'title'    => 'Type',
+					'title'    => __( 'Type', 'magnificent' ),
 					'taxonomy' => 'issue_type',
 				),
 			),
 			'supports' => array( 'title', 'editor', 'excerpt', 'thumbnail' ),
-			'featured_image' => 'Cover Image',
-			'enter_title_here' => 'Issue title',
+			'featured_image' => __( 'Cover Image', 'magnificent' ),
+			'enter_title_here' => __( 'Issue title', 'magnificent'),
 		) );
 
 		$issue_type = register_extended_taxonomy( 'issue_type', 'issue', array(
@@ -157,7 +157,7 @@ class CFTP_Magnificent {
 				'assign_terms' => 'manage_options'
 			),
 			'rewrite' => array(
-				'slug' => 'magazine/issue-type', 
+				'slug' => 'magazine/issue-type', // @TODO needs i18n
 				'with_front' => false
 			),
 		) );
@@ -165,16 +165,15 @@ class CFTP_Magnificent {
 		do_action( 'mag_registered_issue', $article );
 
 		$article = register_extended_post_type( 'article', array(
-			// 'capability_type' => 'cftp_mag_item',
 			'map_meta_cap' => true,
 			'menu_position' => 53,
 			'cols' => array(
 				'title' => array(
-					'title' => 'Issue'
+					'title' => __( 'Issue', 'magnificent' ),
 				),
 				'author',
 				'article_type' => array(
-					'title' => 'Type'
+					'title' => __( 'Type', 'magnificent' ),
 				),
 				'date' => array(
 					'post_field' => 'post_date',
@@ -183,15 +182,15 @@ class CFTP_Magnificent {
 			'right_now' => true,
 			'filters' => array(
 				'issue_type' => array(
-					'title'    => 'Type',
+					'title'    => __( 'Type', 'magnificent' ),
 					'taxonomy' => 'issue_type',
 				),
 			),
-			'labels' => array(
-				'parent_item_colon' => 'From Issue:',
+			'labels' => array( 
+				'parent_item_colon' => __( 'From Issue:', 'magnificent' ),
 			),
 			'supports' => array( 'title', 'editor', 'thumbnail' ),
-			'enter_title_here' => 'Article title',
+			'enter_title_here' => __( 'Article title', 'magnificent' ),
 		) );
 
 		add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_parent_name=$matches[1]&article=$matches[2]', 'top' );
