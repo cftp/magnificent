@@ -213,15 +213,18 @@ class CFTP_Magnificent {
 			'can_create_post' => false,
 			'admin_box' => 'any',
 			'title' => array(
-				'from' => 'Issue',
-				'to'   => 'Articles'
+				'from' => __( 'Issue', 'magnificent'),
+				'to'   => __( 'Articles', 'magnificent'),
 			),
 			'from_labels' => array(
+				'create' => __( 'Add articles', 'magnificent' ),
+			),
+			'to_labels' => array(
+				'create' => __( 'Associate with an issue', 'magnificent' ),
 			),
 			'sortable' => 'to',
 			'cardinality' => 'many-to-one',
 		) );
-		// @TODO: Change the connection creation logo from "+ Create connections" to "Associate with an issue" and "Add articles to this issue"
 
 	}
 
