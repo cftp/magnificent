@@ -124,7 +124,6 @@ class CFTP_Magnificent {
 	function action_init() {
 
 		$issue = register_extended_post_type( 'issue', array(
-			// 'capability_type' => 'cftp_mag_item',
 			'map_meta_cap' => true,
 			'cols' => array(
 				'cover' => array(
