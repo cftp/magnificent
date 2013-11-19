@@ -11,6 +11,22 @@ Author URI: http://codeforthepeople.com/
  
 /*  Copyright 2013 Code for the People Ltd
 
+                _____________
+               /      ____   \
+         _____/       \   \   \
+        /\    \        \___\   \
+       /  \    \                \
+      /   /    /          _______\
+     /   /    /          \       /
+    /   /    /            \     /
+    \   \    \ _____    ___\   /
+     \   \    /\    \  /       \
+      \   \  /  \____\/    _____\
+       \   \/        /    /    / \
+        \           /____/    /___\
+         \                        /
+          \______________________/
+
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or
@@ -78,23 +94,19 @@ class CFTP_Magnificent {
 	 * @return null
 	 */
 	public function __construct() {
-		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
+
+		// Most of the hooks are registered in action_init
 		add_action( 'init', array( $this, 'action_init' ) );
-		add_action( 'save_post', array( $this, 'action_save_post' ), 10, 2 );
-		add_action( 'p2p_created_connection', array( $this, 'action_p2p_created_connection' ) );
-		add_action( 'p2p_delete_connections', array( $this, 'action_p2p_delete_connections' ) );
-		add_filter( 'page_row_actions', array( $this, 'filter_page_row_actions' ), 10, 2 );
-		add_filter( 'post_type_link', array( $this, 'filter_post_type_link' ), 10, 2 );
-		add_filter( 'posts_clauses', array( $this, 'filter_posts_clauses' ), 10, 2 );
-		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
-		add_filter( 'coauthors_supported_post_types', array( $this, 'filter_coauthors_supported_post_types' ) );
+		add_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
 
-
-		$this->version = 3;
+		$this->version = 4;
 
 		if ( ! is_a( $GLOBALS['wp_rewrite'], 'WP_Rewrite' ) )
 			$GLOBALS['wp_rewrite'] = new WP_Rewrite();
-		$this->article_permalink_structure = '/' . $GLOBALS['wp_rewrite']->root . 'issue/%issue%/%article%/';
+		if ( $this->are_publications_enabled() ) {
+			$this->issue_permalink_structure   = '/' . $GLOBALS['wp_rewrite']->root . 'publications/%publication%/%issue%/';
+		} else {
+		}
 		$this->recursing = false;
 	}
 
@@ -114,6 +126,26 @@ class CFTP_Magnificent {
 	}
 
 	/**
+	 * Hooks the WP action admin_notices to whinge if stuff isn't installed.
+	 *
+	 * @action admin_notices
+	 *
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function action_admin_notices() {
+		if ( ! $this->is_p2p_loaded() )
+			$this->admin_notice_error( sprintf( __( 'Please install the <a href="%s">Posts to Posts plugin</a>, as the Magnificent plugin requires it.', 'magnificent' ), 'http://wordpress.org/plugins/posts-to-posts/' ) );
+			
+		if ( ! $this->is_extended_cpts_loaded() )
+			$this->admin_notice_error( sprintf( __( 'Please make the <a href="%s">Extended CPTs library</a> available, as the Magnificent plugin requires it.', 'magnificent' ), 'https://github.com/johnbillion/ExtendedCPTs' ) );
+			
+		if ( ! $this->is_extended_taxos_loaded() )
+			$this->admin_notice_error( sprintf( __( 'Please make the <a href="%s">Extended Taxos library</a> available, as the Magnificent plugin requires it.', 'magnificent' ), 'https://github.com/johnbillion/ExtendedTaxos' ) );
+			
+	}
+
+	/**
 	 * Hooks the WP action init to setup the data structures.
 	 *
 	 * @action init
@@ -121,109 +153,27 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	function action_init() {
+	public function action_init() {
 
-		$issue = register_extended_post_type( 'issue', array(
-			// 'capability_type' => 'cftp_mag_item',
-			'map_meta_cap' => true,
-			'cols' => array(
-				'cover' => array(
-					'title' => '',
-					'featured_image' => 'thumbnail',
-					'height' => 60
-				),
-				'title' => array(
-					'title' => 'Issue'
-				),
-				'date' => array(
-					'post_field' => 'post_date',
-				),
-			),
-			'right_now' => true,
-			'menu_position' => 54,
-			'filters' => array(
-				'issue_type' => array(
-					'title'    => 'Type',
-					'taxonomy' => 'issue_type',
-				),
-			),
-			'supports' => array( 'title', 'editor', 'excerpt', 'thumbnail' ),
-			'featured_image' => 'Cover Image',
-			'enter_title_here' => 'Issue title',
-		) );
+		// Sanity checks
+		if ( ! $this->is_p2p_loaded() )
+			return;
+		if ( ! $this->is_extended_cpts_loaded() )
+			return;
+		if ( ! $this->is_extended_taxos_loaded() )
+			return;
 
-		$issue_type = register_extended_taxonomy( 'issue_type', 'issue', array(
-			'meta_box' => 'radio',
-			'capabilities' => array(
-				'assign_terms' => 'manage_options'
-			),
-			'rewrite' => array(
-				'slug' => 'magazine/issue-type', 
-				'with_front' => false
-			),
-		) );
+		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
+		add_action( 'save_post', array( $this, 'action_save_post' ), 10, 2 );
+		add_action( 'p2p_created_connection', array( $this, 'action_p2p_created_connection' ) );
+		add_action( 'p2p_delete_connections', array( $this, 'action_p2p_delete_connections' ) );
+		add_filter( 'page_row_actions', array( $this, 'filter_page_row_actions' ), 10, 2 );
+		add_filter( 'post_type_link', array( $this, 'filter_post_type_link' ), 10, 2 );
+		add_filter( 'posts_clauses', array( $this, 'filter_posts_clauses' ), 10, 2 );
+		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
+		add_filter( 'coauthors_supported_post_types', array( $this, 'filter_coauthors_supported_post_types' ) );
 
-		do_action( 'mag_registered_issue', $article );
-
-		$article = register_extended_post_type( 'article', array(
-			// 'capability_type' => 'cftp_mag_item',
-			'map_meta_cap' => true,
-			'menu_position' => 53,
-			'cols' => array(
-				'title' => array(
-					'title' => 'Issue'
-				),
-				'author',
-				'article_type' => array(
-					'title' => 'Type'
-				),
-				'date' => array(
-					'post_field' => 'post_date',
-				),
-			),
-			'right_now' => true,
-			'filters' => array(
-				'issue_type' => array(
-					'title'    => 'Type',
-					'taxonomy' => 'issue_type',
-				),
-			),
-			'labels' => array(
-				'parent_item_colon' => 'From Issue:',
-			),
-			'supports' => array( 'title', 'editor', 'thumbnail' ),
-			'enter_title_here' => 'Article title',
-		) );
-
-		add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_parent_name=$matches[1]&article=$matches[2]', 'top' );
-
-
-		$article_type = register_extended_taxonomy( 'article_type', 'article', array(
-			'meta_box' => 'radio',
-			'capabilities' => array(
-				'assign_terms' => 'manage_options'
-			),
-		) );
-
-		do_action( 'mag_registered_article', $article );
-
-		p2p_register_connection_type( array(
-			'name'  => 'issue_to_article',
-			'from'  => 'article',
-			'to'    => 'issue',
-			'can_create_post' => false,
-			'admin_box' => 'any',
-			'title' => array(
-				'from' => 'Issue',
-				'to'   => 'Articles'
-			),
-			'from_labels' => array(
-			),
-			'sortable' => 'to',
-			'cardinality' => 'many-to-one',
-		) );
-		// @TODO: Change the connection creation logo from "+ Create connections" to "Associate with an issue" and "Add articles to this issue"
-
+		$this->register_cpts_taxos();
 	}
 
 	/**
@@ -235,7 +185,7 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	function filter_coauthors_supported_post_types( $post_types ) {
+	public function filter_coauthors_supported_post_types( $post_types ) {
 		$post_types[] = 'article';
 		return $post_types;
 	}
@@ -250,23 +200,15 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	function action_save_post( $post_id, $post ) {
+	public function action_save_post( $post_id, $post ) {
+		// @TODO: You shouldn't be able to publish an article with no issue
+		// @TODO: You shouldn't be able to publish an issue with no publication, if publications are enabled
 		if ( $this->recursing )
 			return;
 		$this->recursing = true;
-		// Get any connected issue and set it as the article post_parent
-		$issues = new WP_Query( array(
-			'connected_type' => 'issue_to_article',
-			'connected_items' => $post->ID,
-			'posts_per_page' => 1,
-		) );
-		if ( $issues->have_posts() ) {
-			$post_data = array(
-				'ID'          => $post_id,
-				'post_parent' => $issues->posts[ 0 ]->ID,
-			);
-			wp_update_post( $post_data );
-		}
+		$this->process_article_relationships( $post );
+		$this->process_issue_relationships( $post );
+		$this->process_publication_relationships( $post );
 		$this->recursing = false;
 	}
 
@@ -315,7 +257,7 @@ class CFTP_Magnificent {
 	 * @author Simon Wheatley
 	 **/
 	public function filter_query_vars( $query_vars ) {
-		return array_merge( $query_vars, array( 'post_parent_name' ) );
+		return array_merge( $query_vars, array( 'parent_issue_name', 'parent_publication_name' ) );
 	}
 
 	/**
@@ -327,12 +269,38 @@ class CFTP_Magnificent {
 	 * @return array An array of SQL clauses from WP_Query
 	 * @author Simon Wheatley
 	 **/
-	public function filter_posts_clauses( $clauses, $query ) {
+	public function filter_posts_clauses( $clauses, WP_Query $query ) {
 		global $wpdb;
-		if ( ! $post_parent_name = $query->get( 'post_parent_name' ) )
+		if ( is_admin() )
 			return $clauses;
-		$sql = " AND $wpdb->posts.post_parent IN ( SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'issue' AND post_status = 'publish' ) ";
-		$clauses[ 'where' ] .= $wpdb->prepare( $sql, $post_parent_name );
+		if ( 'article' == $query->get( 'post_type' ) ) {
+
+			$parent_issue_name = $query->get( 'parent_issue_name' );
+			// Parent issue post must have post name X
+			$sql = " AND $wpdb->posts.post_parent IN ( SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'issue' AND post_status = 'publish' ) ";
+			$clauses[ 'where' ] .= $wpdb->prepare( $sql, $parent_issue_name );
+
+			if ( $this->are_publications_enabled() ) {
+				$parent_publication_name = $query->get( 'parent_publication_name' );
+				// Parent issue post must be amongst the posts which have the 
+				// grandparent publication post as a parent
+				// @FIXME: This might be more efficient with joins rather than subqueries
+				$sql = " AND $wpdb->posts.post_parent IN ( 
+					SELECT ID FROM $wpdb->posts WHERE post_parent IN (
+						SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'publication' AND post_status = 'publish' 
+					)
+				) ";
+				$clauses[ 'where' ] .= $wpdb->prepare( $sql, $parent_publication_name );
+				return $clauses;
+			}
+		}
+		if ( $this->are_publications_enabled() && 'issue' == $query->get( 'post_type' ) ) {
+			$parent_publication_name = $query->get( 'parent_publication_name' );
+			// Parent publication post must have post name X
+			$sql = " AND $wpdb->posts.post_parent IN ( SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'publication' AND post_status = 'publish' ) ";
+			$clauses[ 'where' ] .= $wpdb->prepare( $sql, $parent_publication_name );
+			return $clauses;
+		}
 		return $clauses;
 	}
 
@@ -349,13 +317,11 @@ class CFTP_Magnificent {
 		if ( ! is_object( $wp_rewrite ) || ! $wp_rewrite->using_permalinks() )
 			return $permalink;
 		$post = get_post( $post_id );
-		if ( 'article' == $post->post_type ) {
-			if ( $post->post_parent ) {
-				$parent = get_post( $post->post_parent );
-				$permalink = home_url( str_replace( array( '%issue%', '%article%' ), array( $parent->post_name, $post->post_name ), $this->article_permalink_structure ) );
-			} else {
-				$permalink = '';
-			}
+		switch ( $post->post_type ) {
+			case 'article':
+				return $this->article_link( $permalink, $post );
+			case 'issue':
+				return $this->issue_link( $permalink, $post );
 		}
 		return $permalink;
 	}
@@ -369,8 +335,8 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	function action_p2p_created_connection( $p2p_id ) {
-		// @TODO: Set post_parent for any articles
+	public function action_p2p_created_connection( $p2p_id ) {
+		$this->process_connection_change( $p2p_id );
 	}
 
 	/**
@@ -382,12 +348,202 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	function action_p2p_delete_connections( $p2p_ids ) {
-		// @TODO: Remove post_parent for any now orphaned articles
+	public function action_p2p_delete_connections( $p2p_ids ) {
+		foreach ( $p2p_ids as $p2p_id )
+			$this->process_connection_change( $p2p_id );
 	}
 
 	// CALLBACKS
 	// =========
+
+	// UTILITIES
+	// =========
+
+	/**
+	 * 
+	 *
+	 * @param string $permalink The current permalink
+	 * @param object $post a WP_Post object
+	 * @return string The permalink
+	 * @author Simon Wheatley
+	 **/
+	public function article_link( $permalink, WP_Post $article ) {
+		if ( $article->post_parent ) {
+			$issue = get_post( $article->post_parent );
+			if ( $this->are_publications_enabled() ) {
+				$publication = get_post( $issue->post_parent );
+				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}publication/%publication%/%issue%/%article%/";
+				$search  = array( '%publication%', '%issue%', '%article%' );
+				$replace = array( $publication->post_name, $issue->post_name, $article->post_name );
+			} else {
+				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}issue/%issue%/%article%/";
+				$search  = array( '%issue%', '%article%' );
+				$replace = array( $issue->post_name, $article->post_name );
+			}
+			return home_url( str_replace( $search, $replace, $permalink_structure ) );
+		}
+		return '';
+	}
+
+	/**
+	 * 
+	 *
+	 * @param string $permalink The current permalink
+	 * @param object $post a WP_Post object
+	 * @return string The permalink
+	 * @author Simon Wheatley
+	 **/
+	public function issue_link( $permalink, WP_Post $issue ) {
+		if ( $issue->post_parent ) {
+			if ( $this->are_publications_enabled() ) {
+				$publication = get_post( $issue->post_parent );
+				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}publication/%publication%/%issue%/";
+				$search  = array( '%publication%', '%issue%' );
+				$replace = array( $publication->post_name, $issue->post_name );
+			} else {
+				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}issue/%issue%/";
+				$search  = array( '%issue%' );
+				$replace = array( $issue->post_name );
+			}
+			return home_url( str_replace( $search, $replace, $permalink_structure ) );
+		}
+		return '';
+	}
+
+	/**
+	 * 
+	 *
+	 * @param int $p2p_id The Posts 2 Posts Connection ID
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function process_connection_change( $p2p_id ) {
+		if ( $this->recursing )
+			return;
+
+		$connection = p2p_get_connection( $p2p_id );
+		$post = get_post( $connection->p2p_from );
+
+		$this->recursing = true;
+		$this->process_article_relationships( $post );
+		$this->process_issue_relationships( $post );
+		$this->process_publication_relationships( $post );
+		$this->recursing = false;
+	}
+
+	/**
+	 * Process the data for an article on save.
+	 *
+	 * @param object $post A WP_Post object
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function process_article_relationships( WP_Post $article ) {
+		if ( 'article' != $article->post_type )
+			return;
+
+		// @FIXME: This is near duplicate code with the $publications search and set in process_issue_save
+		// Get any connected issue and set it 
+		// as the article post_parent
+		$issue = new WP_Query( array(
+			'connected_type'  => 'issue_to_article',
+			'connected_items' => $article->ID,
+			'fields'          => 'ids',
+			'posts_per_page'  => 1,
+		) );
+		if ( $issue->posts ) {
+			foreach ( $issue->posts as $issue_post_id ) {
+				$article_post_data = array(
+					'ID'          => $article->ID,
+					'post_parent' => $issue_post_id,
+				);
+				wp_update_post( $article_post_data );
+			}
+		}
+
+	}
+
+	/**
+	 * Process the data for an issue on save.
+	 *
+	 * @param object $post A WP_Post object
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function process_issue_relationships( WP_Post $issue ) {
+		if ( 'issue' != $issue->post_type )
+			return;
+
+		// @FIXME: This is near duplicate code with the $issues search and set in process_publication_save
+		// Get any connected article and set the article parent
+		// to the issue.
+		$articles = new WP_Query( array(
+			'connected_type'  => 'issue_to_article',
+			'connected_items' => $issue->ID,
+			'fields'          => 'ids',
+			'nopaging'        => true,
+		) );
+		if ( $articles->posts ) {
+			foreach ( $articles->posts as $article_post_id ) {
+				$article_post_data = array(
+					'ID'          => $article_post_id,
+					'post_parent' => $issue->ID,
+				);
+				wp_update_post( $article_post_data );
+			}
+		}
+
+		// Get any connected publication and set it 
+		// as the issue post_parent
+		// N.B. Publications might not be enabled, in which
+		// case this query returns nothing.
+		$publications = new WP_Query( array(
+			'connected_type' => 'publication_to_issue',
+			'connected_items' => $issue->ID,
+			'fields'          => 'ids',
+			'posts_per_page'  => 1,
+		) );
+		if ( $publications->posts ) {
+			foreach ( $publications->posts as $publication_post_id ) {
+				$issue_post_data = array(
+					'ID'          => $issue->ID,
+					'post_parent' => $publication_post_id,
+				);
+				wp_update_post( $issue_post_data );
+			}
+		}
+
+	}
+
+	/**
+	 * Process the data for a publication on save.
+	 *
+	 * @param object $post A WP_Post object
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function process_publication_relationships( WP_Post $publication ) {
+		if ( 'publication' != $publication->post_type )
+			return;
+
+		// Get any connected issues and set this publication
+		// as the issue post_parent
+		$issues = new WP_Query( array(
+			'connected_type'  => 'publication_to_issue',
+			'connected_items' => $publication->ID,
+			'fields'          => 'ids',
+			'nopaging'        => true,
+		) );
+		if ( $issues->posts ) {
+			foreach ( $issues->posts as $issue_post_id ) {
+				$issue_post_data = array(
+					'ID'          => $issue_post_id,
+					'post_parent' => $publication->ID,
+				);
+				wp_update_post( $issue_post_data );
+			}
+		}
+	}
 
 	/**
 	 * 
@@ -396,12 +552,184 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	public function callback_col_post_author(  ) {
-		var_dump( func_get_args( ) );
-	}
+	public function register_cpts_taxos() {
 
-	// UTILITIES
-	// =========
+		// @TODO: Add filter by publication (post_parent)
+		$issue_args = array(
+			'map_meta_cap' => true,
+			'cols' => array(
+				'cover' => array(
+					'title' => '',
+					'featured_image' => 'thumbnail',
+					'height' => 60
+				),
+				'title' => array(
+					'title' => 'Issue'
+				),
+				'date' => array(
+					'post_field' => 'post_date',
+				),
+			),
+			'right_now' => true,
+			'menu_position' => 54,
+			'filters' => array(
+				'issue_type' => array(
+					'title'    => __( 'Type', 'magnificent' ),
+					'taxonomy' => 'issue_type',
+				),
+			),
+			'labels' => array( 
+				'parent_item_colon' => __( 'From Publication:', 'magnificent' ),
+			),
+			'supports' => array( 'title', 'editor', 'excerpt', 'thumbnail' ),
+			'featured_image' => __( 'Cover Image', 'magnificent' ),
+			'enter_title_here' => __( 'Issue title', 'magnificent'),
+		);
+		if ( $this->are_publications_enabled() )
+			$issue_args[ 'rewrite' ] = false;
+		$issue = register_extended_post_type( 'issue', $issue_args );
+
+		$issue_type = register_extended_taxonomy( 'issue_type', 'issue', array(
+			'meta_box' => 'radio',
+			'capabilities' => array(
+				'assign_terms' => 'manage_options'
+			),
+			'rewrite' => array(
+				'slug' => 'magazine/issue-type', // @TODO needs i18n
+				'with_front' => false
+			),
+		) );
+
+		do_action( 'mag_registered_issue', $article );
+
+		// @TODO: Add filter by issue (post_parent)
+		$article = register_extended_post_type( 'article', array(
+			'map_meta_cap' => true,
+			'menu_position' => 53,
+			'cols' => array(
+				'title' => array(
+					'title' => __( 'Issue', 'magnificent' ),
+				),
+				'author',
+				'article_type' => array(
+					'title' => __( 'Type', 'magnificent' ),
+				),
+				'date' => array(
+					'post_field' => 'post_date',
+				),
+			),
+			'right_now' => true,
+			'filters' => array(
+				'issue_type' => array(
+					'title'    => __( 'Type', 'magnificent' ),
+					'taxonomy' => 'issue_type',
+				),
+			),
+			'labels' => array( 
+				'parent_item_colon' => __( 'From Issue:', 'magnificent' ),
+			),
+			'supports' => array( 'title', 'editor', 'thumbnail' ),
+			'enter_title_here' => __( 'Article title', 'magnificent' ),
+			'rewrite' => false,
+		) );
+
+		if ( $this->are_publications_enabled() ) {
+
+			$publication = register_extended_post_type( 'publication', array(
+				'map_meta_cap' => true,
+				'menu_position' => 53,
+				'cols' => array(
+					'cover' => array(
+						'title' => '',
+						'featured_image' => 'thumbnail',
+						'height' => 60
+					),
+					'title' => array(
+						'title' => __( 'Publication', 'magnificent' ),
+					),
+				),
+				'right_now' => true,
+				'filters' => array(
+				),
+				'supports' => array( 'title', 'editor', 'thumbnail' ),
+				'enter_title_here' => __( 'Article title', 'magnificent' ),
+				'rewrite' => array(
+					'slug'      => 'publication',
+				),
+				'has_archive' => 'publications',
+			) );
+
+			p2p_register_connection_type( array(
+				'name'  => 'publication_to_issue',
+				'from'  => 'issue',
+				'to'    => 'publication',
+				'can_create_post' => false,
+				'admin_box' => 'any',
+				'title' => array(
+					'from' => __( 'Issue', 'magnificent'),
+					'to'   => __( 'Publication', 'magnificent'),
+				),
+				'from_labels' => array(
+					'create' => __( 'Add issues', 'magnificent' ),
+				),
+				'to_labels' => array(
+					'create' => __( 'Associate with a publication', 'magnificent' ),
+				),
+				'sortable' => 'to',
+				'cardinality' => 'many-to-one',
+			) );
+
+		}
+
+		// Rewrite rules for articles
+		if ( $this->are_publications_enabled() )
+			add_rewrite_rule( 'publication/([^/]+)/([^/]+)/([^/]+)', 'index.php?post_type=article&parent_publication_name=$matches[1]&parent_issue_name=$matches[2]&article=$matches[3]', 'top' );
+		else
+			add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_type=article&parent_issue_name=$matches[1]&article=$matches[2]', 'top' );
+
+		// Rewrite rules for issues
+		if ( $this->are_publications_enabled() )
+			add_rewrite_rule( 'publication/([^/]+)/([^/]+)', 'index.php?post_type=issue&parent_publication_name=$matches[1]&issue=$matches[2]', 'top' );
+		else
+			add_rewrite_rule( 'issue/([^/]+)', 'index.php?post_type=issue&issue=$matches[1]', 'top' );
+
+		$article_type = register_extended_taxonomy( 'article_type', 'article', array(
+			'meta_box' => 'radio',
+			'capabilities' => array(
+				'assign_terms' => 'manage_options'
+			),
+		) );
+
+		/**
+		 * Called when the article post type has been registered.
+		 *
+		 * @since 0.4
+		 *
+		 * @param object $article A WordPress PostType Object.
+		 */
+		do_action( 'mag_registered_article', $article );
+
+		p2p_register_connection_type( array(
+			'name'  => 'issue_to_article',
+			'from'  => 'article',
+			'to'    => 'issue',
+			'can_create_post' => false,
+			'admin_box' => 'any',
+			'title' => array(
+				'from' => __( 'Issue', 'magnificent'),
+				'to'   => __( 'Articles', 'magnificent'),
+			),
+			'from_labels' => array(
+				'create' => __( 'Add articles', 'magnificent' ),
+			),
+			'to_labels' => array(
+				'create' => __( 'Associate with an issue', 'magnificent' ),
+			),
+			'sortable' => 'to',
+			'cardinality' => 'many-to-one',
+		) );
+
+	}
 
 	/**
 	 * Wrapper for wp_enqueue_script which takes care of the version checks
@@ -456,6 +784,93 @@ class CFTP_Magnificent {
 	}
 
 	/**
+	 * Output the HTML for an admin notice area error.
+	 *
+	 * @param sting $msg The error message to show
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function admin_notice_error( $msg ) {
+		$allowed_html = array(
+			'address' => array(),
+			'a' => array(
+				'href' => true,
+				'name' => true,
+				'target' => true,
+			),
+			'em' => array(),
+			'strong' => array(),
+		);
+		?>
+		<div class="fade error" id="message">
+			<p><?php echo wp_kses( $msg, $allowed_html ); ?></p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Checks whether to enable the Publications feature
+	 * of this plugin, which adds the Publications CPT
+	 * enabling the site to represent more than one brand
+	 * to associate issues (and through them articles) with.
+	 *
+	 * @return bool True if Publications should be active.
+	 * @author Simon Wheatley
+	 **/
+	public function are_publications_enabled() {
+		$enabled = false;
+
+		/**
+		 * Filter the value returned to activate (or not) the 
+		 * Publications feature of Magnificent.
+		 *
+		 * @since 0.5
+		 * 
+		 * @param bool $enabled Whether the Publication feature is enabled, defaults to false.
+		 */
+		return apply_filters( 'mag_are_publications_enabled', $enabled );
+	}
+
+	/**
+	 * Checks Posts to Posts plugin is active, by checking for
+	 * the P2P_PLUGIN_VERSION constant.
+	 *
+	 * @return bool True if Posts to Posts is active
+	 * @author Simon Wheatley
+	 **/
+	public function is_p2p_loaded() {
+		if ( ! defined( 'P2P_PLUGIN_VERSION' ) )
+			return false;
+		return true;
+	}
+
+	/**
+	 * Checks John Blackbourn's Extended Taxonomies library is present,
+	 * by checking for the register_extended_post_type function.
+	 *
+	 * @return bool True if Posts to Posts is active
+	 * @author Simon Wheatley
+	 **/
+	public function is_extended_taxos_loaded() {
+		if ( ! is_callable( 'register_extended_taxonomy' ) )
+			return false;
+		return true;
+	}
+
+	/**
+	 * Checks John Blackbourn's Extended Taxonomies library is present,
+	 * by checking for the register_extended_post_type function.
+	 *
+	 * @return bool True if Posts to Posts is active
+	 * @author Simon Wheatley
+	 **/
+	public function is_extended_cpts_loaded() {
+		if ( ! is_callable( 'register_extended_post_type' ) )
+			return false;
+		return true;
+	}
+
+	/**
 	 * Checks the DB structure is up to date, rewrite rules, 
 	 * theme image size options are set, etc.
 	 *
@@ -469,7 +884,7 @@ class CFTP_Magnificent {
 		if ( $version == $this->version )
 			return;
 
-		if ( $version < 3 ) {
+		if ( $version < 4 ) {
 			flush_rewrite_rules();
 			error_log( "CFTP Magnificent: Flush rewrite rules" );
 		}
@@ -484,5 +899,4 @@ class CFTP_Magnificent {
 
 // Initiate the singleton
 CFTP_Magnificent::init();
-
 
