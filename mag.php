@@ -330,17 +330,6 @@ class CFTP_Magnificent {
 	// CALLBACKS
 	// =========
 
-	/**
-	 * 
-	 *
-	 *
-	 * @return void
-	 * @author Simon Wheatley
-	 **/
-	public function callback_col_post_author(  ) {
-		var_dump( func_get_args( ) );
-	}
-
 	// UTILITIES
 	// =========
 
