@@ -271,13 +271,33 @@ class CFTP_Magnificent {
 	 **/
 	public function filter_posts_clauses( $clauses, WP_Query $query ) {
 		global $wpdb;
-		if ( $parent_issue_name = $query->get( 'parent_issue_name' ) ) {
+		if ( 'article' == $query->get( 'post_type' ) ) {
+
+			$parent_issue_name = $query->get( 'parent_issue_name' );
+			// Parent issue post must have post name X
 			$sql = " AND $wpdb->posts.post_parent IN ( SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'issue' AND post_status = 'publish' ) ";
 			$clauses[ 'where' ] .= $wpdb->prepare( $sql, $parent_issue_name );
+
+			if ( $this->are_publications_enabled() ) {
+				$parent_publication_name = $query->get( 'parent_publication_name' );
+				// Parent issue post must be amongst the posts which have the 
+				// grandparent publication post as a parent
+				// @FIXME: This might be more efficient with joins rather than subqueries
+				$sql = " AND $wpdb->posts.post_parent IN ( 
+					SELECT ID FROM $wpdb->posts WHERE post_parent IN (
+						SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'publication' AND post_status = 'publish' 
+					)
+				) ";
+				$clauses[ 'where' ] .= $wpdb->prepare( $sql, $parent_publication_name );
+				return $clauses;
+			}
 		}
-		if ( $parent_publication_name = $query->get( 'parent_publication_name' ) ) {
+		if ( $this->are_publications_enabled() && 'issue' == $query->get( 'post_type' ) ) {
+			$parent_publication_name = $query->get( 'parent_publication_name' );
+			// Parent publication post must have post name X
 			$sql = " AND $wpdb->posts.post_parent IN ( SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'publication' AND post_status = 'publish' ) ";
 			$clauses[ 'where' ] .= $wpdb->prepare( $sql, $parent_publication_name );
+			return $clauses;
 		}
 		return $clauses;
 	}
@@ -661,7 +681,7 @@ class CFTP_Magnificent {
 
 		// Rewrite rules for articles
 		if ( $this->are_publications_enabled() )
-			add_rewrite_rule( 'publication/([^/]+)/([^/]+)/([^/]+)', 'index.php?post_type=article&parent_issue_name=$matches[2]&article=$matches[3]', 'top' );
+			add_rewrite_rule( 'publication/([^/]+)/([^/]+)/([^/]+)', 'index.php?post_type=article&parent_publication_name=$matches[1]&parent_issue_name=$matches[2]&article=$matches[3]', 'top' );
 		else
 			add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_type=article&parent_issue_name=$matches[1]&article=$matches[2]', 'top' );
 
