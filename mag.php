@@ -382,6 +382,9 @@ class CFTP_Magnificent {
 					'taxonomy' => 'issue_type',
 				),
 			),
+			'labels' => array( 
+				'parent_item_colon' => __( 'From Publication:', 'magnificent' ),
+			),
 			'supports' => array( 'title', 'editor', 'excerpt', 'thumbnail' ),
 			'featured_image' => __( 'Cover Image', 'magnificent' ),
 			'enter_title_here' => __( 'Issue title', 'magnificent'),
@@ -430,6 +433,51 @@ class CFTP_Magnificent {
 		) );
 
 		add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_parent_name=$matches[1]&article=$matches[2]', 'top' );
+
+
+		if ( $this->are_publications_enabled() ) {
+
+			$publication = register_extended_post_type( 'publication', array(
+				'map_meta_cap' => true,
+				'menu_position' => 53,
+				'cols' => array(
+					'cover' => array(
+						'title' => '',
+						'featured_image' => 'thumbnail',
+						'height' => 60
+					),
+					'title' => array(
+						'title' => __( 'Publication', 'magnificent' ),
+					),
+				),
+				'right_now' => true,
+				'filters' => array(
+				),
+				'supports' => array( 'title', 'editor', 'thumbnail' ),
+				'enter_title_here' => __( 'Article title', 'magnificent' ),
+			) );
+
+			p2p_register_connection_type( array(
+				'name'  => 'publication_to_issue',
+				'from'  => 'issue',
+				'to'    => 'publication',
+				'can_create_post' => false,
+				'admin_box' => 'any',
+				'title' => array(
+					'from' => __( 'Issue', 'magnificent'),
+					'to'   => __( 'Publication', 'magnificent'),
+				),
+				'from_labels' => array(
+					'create' => __( 'Add issues', 'magnificent' ),
+				),
+				'to_labels' => array(
+					'create' => __( 'Associate with a publication', 'magnificent' ),
+				),
+				'sortable' => 'to',
+				'cardinality' => 'many-to-one',
+			) );
+
+		}
 
 
 		$article_type = register_extended_taxonomy( 'article_type', 'article', array(
@@ -545,6 +593,29 @@ class CFTP_Magnificent {
 			<p><?php echo wp_kses( $msg, $allowed_html ); ?></p>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Checks whether to enable the Publications feature
+	 * of this plugin, which adds the Publications CPT
+	 * enabling the site to represent more than one brand
+	 * to associate issues (and through them articles) with.
+	 *
+	 * @return bool True if Publications should be active.
+	 * @author Simon Wheatley
+	 **/
+	public function are_publications_enabled() {
+		$enabled = false;
+
+		/**
+		 * Filter the value returned to activate (or not) the 
+		 * Publications feature of Magnificent.
+		 *
+		 * @since 0.5
+		 * 
+		 * @param bool $enabled Whether the Publication feature is enabled, defaults to false.
+		 */
+		return apply_filters( 'mag_are_publications_enabled', $enabled );
 	}
 
 	/**
