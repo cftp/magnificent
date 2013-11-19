@@ -103,7 +103,10 @@ class CFTP_Magnificent {
 
 		if ( ! is_a( $GLOBALS['wp_rewrite'], 'WP_Rewrite' ) )
 			$GLOBALS['wp_rewrite'] = new WP_Rewrite();
-		$this->article_permalink_structure = '/' . $GLOBALS['wp_rewrite']->root . 'issue/%issue%/%article%/';
+		if ( $this->are_publications_enabled() ) {
+			$this->issue_permalink_structure   = '/' . $GLOBALS['wp_rewrite']->root . 'publications/%publication%/%issue%/';
+		} else {
+		}
 		$this->recursing = false;
 	}
 
@@ -288,13 +291,11 @@ class CFTP_Magnificent {
 		if ( ! is_object( $wp_rewrite ) || ! $wp_rewrite->using_permalinks() )
 			return $permalink;
 		$post = get_post( $post_id );
-		if ( 'article' == $post->post_type ) {
-			if ( $post->post_parent ) {
-				$parent = get_post( $post->post_parent );
-				$permalink = home_url( str_replace( array( '%issue%', '%article%' ), array( $parent->post_name, $post->post_name ), $this->article_permalink_structure ) );
-			} else {
-				$permalink = '';
-			}
+		switch ( $post->post_type ) {
+			case 'article':
+				return $this->article_link( $permalink, $post );
+			case 'issue':
+				return $this->issue_link( $permalink, $post );
 		}
 		return $permalink;
 	}
@@ -309,7 +310,6 @@ class CFTP_Magnificent {
 	 * @author Simon Wheatley
 	 **/
 	public function action_p2p_created_connection( $p2p_id ) {
-		
 		$this->process_connection_change( $p2p_id );
 	}
 
@@ -343,6 +343,57 @@ class CFTP_Magnificent {
 
 	// UTILITIES
 	// =========
+
+	/**
+	 * 
+	 *
+	 * @param string $permalink The current permalink
+	 * @param object $post a WP_Post object
+	 * @return string The permalink
+	 * @author Simon Wheatley
+	 **/
+	public function article_link( $permalink, WP_Post $article ) {
+		if ( $article->post_parent ) {
+			$issue = get_post( $article->post_parent );
+			if ( $this->are_publications_enabled() ) {
+				$publication = get_post( $issue->post_parent );
+				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}publications/%publication%/%issue%/%article%/";
+				$search  = array( '%publication%', '%issue%', '%article%' );
+				$replace = array( $publication->post_name, $issue->post_name, $article->post_name );
+			} else {
+				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}issue/%issue%/%article%/";
+				$search  = array( '%issue%', '%article%' );
+				$replace = array( $issue->post_name, $article->post_name );
+			}
+			return home_url( str_replace( $search, $replace, $permalink_structure ) );
+		}
+		return '';
+	}
+
+	/**
+	 * 
+	 *
+	 * @param string $permalink The current permalink
+	 * @param object $post a WP_Post object
+	 * @return string The permalink
+	 * @author Simon Wheatley
+	 **/
+	public function issue_link( $permalink, WP_Post $issue ) {
+		if ( $issue->post_parent ) {
+			if ( $this->are_publications_enabled() ) {
+				$publication = get_post( $issue->post_parent );
+				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}publications/%publication%/%issue%/";
+				$search  = array( '%publication%', '%issue%' );
+				$replace = array( $publication->post_name, $issue->post_name );
+			} else {
+				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}issue/%issue%/";
+				$search  = array( '%issue%' );
+				$replace = array( $issue->post_name );
+			}
+			return home_url( str_replace( $search, $replace, $permalink_structure ) );
+		}
+		return '';
+	}
 
 	/**
 	 * 
@@ -479,13 +530,17 @@ class CFTP_Magnificent {
 		}
 	}
 
+	/**
+	 * 
+	 *
 	 *
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
 	public function register_cpts_taxos() {
 
-		$issue = register_extended_post_type( 'issue', array(
+		// @TODO: Add filter by publication (post_parent)
+		$issue_args = array(
 			'map_meta_cap' => true,
 			'cols' => array(
 				'cover' => array(
@@ -514,7 +569,10 @@ class CFTP_Magnificent {
 			'supports' => array( 'title', 'editor', 'excerpt', 'thumbnail' ),
 			'featured_image' => __( 'Cover Image', 'magnificent' ),
 			'enter_title_here' => __( 'Issue title', 'magnificent'),
-		) );
+		);
+		if ( $this->are_publications_enabled() )
+			$issue_args[ 'rewrite' ] = false;
+		$issue = register_extended_post_type( 'issue', $issue_args );
 
 		$issue_type = register_extended_taxonomy( 'issue_type', 'issue', array(
 			'meta_box' => 'radio',
@@ -529,6 +587,7 @@ class CFTP_Magnificent {
 
 		do_action( 'mag_registered_issue', $article );
 
+		// @TODO: Add filter by issue (post_parent)
 		$article = register_extended_post_type( 'article', array(
 			'map_meta_cap' => true,
 			'menu_position' => 53,
@@ -556,10 +615,14 @@ class CFTP_Magnificent {
 			),
 			'supports' => array( 'title', 'editor', 'thumbnail' ),
 			'enter_title_here' => __( 'Article title', 'magnificent' ),
+			'rewrite' => false,
 		) );
 
-		add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_parent_name=$matches[1]&article=$matches[2]', 'top' );
-
+		// Rewrite rules for articles
+		if ( $this->are_publications_enabled() )
+			add_rewrite_rule( 'publication/([^/]+)/([^/]+)/([^/]+)', 'index.php?publication_name=$matches[1]&post_parent_name=$matches[2]&article=$matches[3]', 'top' );
+		else
+			add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_parent_name=$matches[1]&article=$matches[2]', 'top' );
 
 		if ( $this->are_publications_enabled() ) {
 
@@ -581,6 +644,10 @@ class CFTP_Magnificent {
 				),
 				'supports' => array( 'title', 'editor', 'thumbnail' ),
 				'enter_title_here' => __( 'Article title', 'magnificent' ),
+				'rewrite' => array(
+					'slug'      => 'publication',
+				),
+				'has_archive' => 'publications',
 			) );
 
 			p2p_register_connection_type( array(
@@ -604,7 +671,6 @@ class CFTP_Magnificent {
 			) );
 
 		}
-
 
 		$article_type = register_extended_taxonomy( 'article_type', 'article', array(
 			'meta_box' => 'radio',
