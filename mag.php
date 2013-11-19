@@ -439,6 +439,13 @@ class CFTP_Magnificent {
 			),
 		) );
 
+		/**
+		 * Called when the article post type has been registered.
+		 *
+		 * @since 0.4
+		 *
+		 * @param object $article A WordPress PostType Object.
+		 */
 		do_action( 'mag_registered_article', $article );
 
 		p2p_register_connection_type( array(
