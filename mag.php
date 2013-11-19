@@ -94,17 +94,10 @@ class CFTP_Magnificent {
 	 * @return null
 	 */
 	public function __construct() {
-		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
-		add_action( 'init', array( $this, 'action_init' ) );
-		add_action( 'save_post', array( $this, 'action_save_post' ), 10, 2 );
-		add_action( 'p2p_created_connection', array( $this, 'action_p2p_created_connection' ) );
-		add_action( 'p2p_delete_connections', array( $this, 'action_p2p_delete_connections' ) );
-		add_filter( 'page_row_actions', array( $this, 'filter_page_row_actions' ), 10, 2 );
-		add_filter( 'post_type_link', array( $this, 'filter_post_type_link' ), 10, 2 );
-		add_filter( 'posts_clauses', array( $this, 'filter_posts_clauses' ), 10, 2 );
-		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
-		add_filter( 'coauthors_supported_post_types', array( $this, 'filter_coauthors_supported_post_types' ) );
 
+		// Most of the hooks are registered in action_init
+		add_action( 'init', array( $this, 'action_init' ) );
+		add_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
 
 		$this->version = 3;
 
@@ -130,6 +123,26 @@ class CFTP_Magnificent {
 	}
 
 	/**
+	 * Hooks the WP action admin_notices to whinge if stuff isn't installed.
+	 *
+	 * @action admin_notices
+	 *
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function action_admin_notices() {
+		if ( ! $this->is_p2p_loaded() )
+			$this->admin_notice_error( sprintf( __( 'Please install the <a href="%s">Posts to Posts plugin</a>, as the Magnificent plugin requires it.', 'magnificent' ), 'http://wordpress.org/plugins/posts-to-posts/' ) );
+			
+		if ( ! $this->is_extended_cpts_loaded() )
+			$this->admin_notice_error( sprintf( __( 'Please make the <a href="%s">Extended CPTs library</a> available, as the Magnificent plugin requires it.', 'magnificent' ), 'https://github.com/johnbillion/ExtendedCPTs' ) );
+			
+		if ( ! $this->is_extended_taxos_loaded() )
+			$this->admin_notice_error( sprintf( __( 'Please make the <a href="%s">Extended Taxos library</a> available, as the Magnificent plugin requires it.', 'magnificent' ), 'https://github.com/johnbillion/ExtendedTaxos' ) );
+			
+	}
+
+	/**
 	 * Hooks the WP action init to setup the data structures.
 	 *
 	 * @action init
@@ -137,110 +150,27 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	function action_init() {
+	public function action_init() {
 
-		$issue = register_extended_post_type( 'issue', array(
-			'map_meta_cap' => true,
-			'cols' => array(
-				'cover' => array(
-					'title' => '',
-					'featured_image' => 'thumbnail',
-					'height' => 60
-				),
-				'title' => array(
-					'title' => 'Issue'
-				),
-				'date' => array(
-					'post_field' => 'post_date',
-				),
-			),
-			'right_now' => true,
-			'menu_position' => 54,
-			'filters' => array(
-				'issue_type' => array(
-					'title'    => __( 'Type', 'magnificent' ),
-					'taxonomy' => 'issue_type',
-				),
-			),
-			'supports' => array( 'title', 'editor', 'excerpt', 'thumbnail' ),
-			'featured_image' => __( 'Cover Image', 'magnificent' ),
-			'enter_title_here' => __( 'Issue title', 'magnificent'),
-		) );
+		// Sanity checks
+		if ( ! $this->is_p2p_loaded() )
+			return;
+		if ( ! $this->is_extended_cpts_loaded() )
+			return;
+		if ( ! $this->is_extended_taxos_loaded() )
+			return;
 
-		$issue_type = register_extended_taxonomy( 'issue_type', 'issue', array(
-			'meta_box' => 'radio',
-			'capabilities' => array(
-				'assign_terms' => 'manage_options'
-			),
-			'rewrite' => array(
-				'slug' => 'magazine/issue-type', // @TODO needs i18n
-				'with_front' => false
-			),
-		) );
+		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
+		add_action( 'save_post', array( $this, 'action_save_post' ), 10, 2 );
+		add_action( 'p2p_created_connection', array( $this, 'action_p2p_created_connection' ) );
+		add_action( 'p2p_delete_connections', array( $this, 'action_p2p_delete_connections' ) );
+		add_filter( 'page_row_actions', array( $this, 'filter_page_row_actions' ), 10, 2 );
+		add_filter( 'post_type_link', array( $this, 'filter_post_type_link' ), 10, 2 );
+		add_filter( 'posts_clauses', array( $this, 'filter_posts_clauses' ), 10, 2 );
+		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
+		add_filter( 'coauthors_supported_post_types', array( $this, 'filter_coauthors_supported_post_types' ) );
 
-		do_action( 'mag_registered_issue', $article );
-
-		$article = register_extended_post_type( 'article', array(
-			'map_meta_cap' => true,
-			'menu_position' => 53,
-			'cols' => array(
-				'title' => array(
-					'title' => __( 'Issue', 'magnificent' ),
-				),
-				'author',
-				'article_type' => array(
-					'title' => __( 'Type', 'magnificent' ),
-				),
-				'date' => array(
-					'post_field' => 'post_date',
-				),
-			),
-			'right_now' => true,
-			'filters' => array(
-				'issue_type' => array(
-					'title'    => __( 'Type', 'magnificent' ),
-					'taxonomy' => 'issue_type',
-				),
-			),
-			'labels' => array( 
-				'parent_item_colon' => __( 'From Issue:', 'magnificent' ),
-			),
-			'supports' => array( 'title', 'editor', 'thumbnail' ),
-			'enter_title_here' => __( 'Article title', 'magnificent' ),
-		) );
-
-		add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_parent_name=$matches[1]&article=$matches[2]', 'top' );
-
-
-		$article_type = register_extended_taxonomy( 'article_type', 'article', array(
-			'meta_box' => 'radio',
-			'capabilities' => array(
-				'assign_terms' => 'manage_options'
-			),
-		) );
-
-		do_action( 'mag_registered_article', $article );
-
-		p2p_register_connection_type( array(
-			'name'  => 'issue_to_article',
-			'from'  => 'article',
-			'to'    => 'issue',
-			'can_create_post' => false,
-			'admin_box' => 'any',
-			'title' => array(
-				'from' => __( 'Issue', 'magnificent'),
-				'to'   => __( 'Articles', 'magnificent'),
-			),
-			'from_labels' => array(
-				'create' => __( 'Add articles', 'magnificent' ),
-			),
-			'to_labels' => array(
-				'create' => __( 'Associate with an issue', 'magnificent' ),
-			),
-			'sortable' => 'to',
-			'cardinality' => 'many-to-one',
-		) );
-
+		$this->register_cpts_taxos();
 	}
 
 	/**
@@ -252,7 +182,7 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	function filter_coauthors_supported_post_types( $post_types ) {
+	public function filter_coauthors_supported_post_types( $post_types ) {
 		$post_types[] = 'article';
 		return $post_types;
 	}
@@ -267,7 +197,7 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	function action_save_post( $post_id, $post ) {
+	public function action_save_post( $post_id, $post ) {
 		if ( $this->recursing )
 			return;
 		$this->recursing = true;
@@ -386,7 +316,7 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	function action_p2p_created_connection( $p2p_id ) {
+	public function action_p2p_created_connection( $p2p_id ) {
 		// @TODO: Set post_parent for any articles
 	}
 
@@ -399,7 +329,7 @@ class CFTP_Magnificent {
 	 * @return void
 	 * @author Simon Wheatley
 	 **/
-	function action_p2p_delete_connections( $p2p_ids ) {
+	public function action_p2p_delete_connections( $p2p_ids ) {
 		// @TODO: Remove post_parent for any now orphaned articles
 	}
 
@@ -419,6 +349,119 @@ class CFTP_Magnificent {
 
 	// UTILITIES
 	// =========
+
+	/**
+	 * 
+	 *
+	 *
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function register_cpts_taxos() {
+
+		$issue = register_extended_post_type( 'issue', array(
+			'map_meta_cap' => true,
+			'cols' => array(
+				'cover' => array(
+					'title' => '',
+					'featured_image' => 'thumbnail',
+					'height' => 60
+				),
+				'title' => array(
+					'title' => 'Issue'
+				),
+				'date' => array(
+					'post_field' => 'post_date',
+				),
+			),
+			'right_now' => true,
+			'menu_position' => 54,
+			'filters' => array(
+				'issue_type' => array(
+					'title'    => __( 'Type', 'magnificent' ),
+					'taxonomy' => 'issue_type',
+				),
+			),
+			'supports' => array( 'title', 'editor', 'excerpt', 'thumbnail' ),
+			'featured_image' => __( 'Cover Image', 'magnificent' ),
+			'enter_title_here' => __( 'Issue title', 'magnificent'),
+		) );
+
+		$issue_type = register_extended_taxonomy( 'issue_type', 'issue', array(
+			'meta_box' => 'radio',
+			'capabilities' => array(
+				'assign_terms' => 'manage_options'
+			),
+			'rewrite' => array(
+				'slug' => 'magazine/issue-type', // @TODO needs i18n
+				'with_front' => false
+			),
+		) );
+
+		do_action( 'mag_registered_issue', $article );
+
+		$article = register_extended_post_type( 'article', array(
+			'map_meta_cap' => true,
+			'menu_position' => 53,
+			'cols' => array(
+				'title' => array(
+					'title' => __( 'Issue', 'magnificent' ),
+				),
+				'author',
+				'article_type' => array(
+					'title' => __( 'Type', 'magnificent' ),
+				),
+				'date' => array(
+					'post_field' => 'post_date',
+				),
+			),
+			'right_now' => true,
+			'filters' => array(
+				'issue_type' => array(
+					'title'    => __( 'Type', 'magnificent' ),
+					'taxonomy' => 'issue_type',
+				),
+			),
+			'labels' => array( 
+				'parent_item_colon' => __( 'From Issue:', 'magnificent' ),
+			),
+			'supports' => array( 'title', 'editor', 'thumbnail' ),
+			'enter_title_here' => __( 'Article title', 'magnificent' ),
+		) );
+
+		add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_parent_name=$matches[1]&article=$matches[2]', 'top' );
+
+
+		$article_type = register_extended_taxonomy( 'article_type', 'article', array(
+			'meta_box' => 'radio',
+			'capabilities' => array(
+				'assign_terms' => 'manage_options'
+			),
+		) );
+
+		do_action( 'mag_registered_article', $article );
+
+		p2p_register_connection_type( array(
+			'name'  => 'issue_to_article',
+			'from'  => 'article',
+			'to'    => 'issue',
+			'can_create_post' => false,
+			'admin_box' => 'any',
+			'title' => array(
+				'from' => __( 'Issue', 'magnificent'),
+				'to'   => __( 'Articles', 'magnificent'),
+			),
+			'from_labels' => array(
+				'create' => __( 'Add articles', 'magnificent' ),
+			),
+			'to_labels' => array(
+				'create' => __( 'Associate with an issue', 'magnificent' ),
+			),
+			'sortable' => 'to',
+			'cardinality' => 'many-to-one',
+		) );
+
+	}
 
 	/**
 	 * Wrapper for wp_enqueue_script which takes care of the version checks
@@ -473,6 +516,70 @@ class CFTP_Magnificent {
 	}
 
 	/**
+	 * Output the HTML for an admin notice area error.
+	 *
+	 * @param sting $msg The error message to show
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function admin_notice_error( $msg ) {
+		$allowed_html = array(
+			'address' => array(),
+			'a' => array(
+				'href' => true,
+				'name' => true,
+				'target' => true,
+			),
+			'em' => array(),
+			'strong' => array(),
+		);
+		?>
+		<div class="fade error" id="message">
+			<p><?php echo wp_kses( $msg, $allowed_html ); ?></p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Checks Posts to Posts plugin is active, by checking for
+	 * the P2P_PLUGIN_VERSION constant.
+	 *
+	 * @return bool True if Posts to Posts is active
+	 * @author Simon Wheatley
+	 **/
+	public function is_p2p_loaded() {
+		if ( ! defined( 'P2P_PLUGIN_VERSION' ) )
+			return false;
+		return true;
+	}
+
+	/**
+	 * Checks John Blackbourn's Extended Taxonomies library is present,
+	 * by checking for the register_extended_post_type function.
+	 *
+	 * @return bool True if Posts to Posts is active
+	 * @author Simon Wheatley
+	 **/
+	public function is_extended_taxos_loaded() {
+		if ( ! is_callable( 'register_extended_taxonomy' ) )
+			return false;
+		return true;
+	}
+
+	/**
+	 * Checks John Blackbourn's Extended Taxonomies library is present,
+	 * by checking for the register_extended_post_type function.
+	 *
+	 * @return bool True if Posts to Posts is active
+	 * @author Simon Wheatley
+	 **/
+	public function is_extended_cpts_loaded() {
+		if ( ! is_callable( 'register_extended_post_type' ) )
+			return false;
+		return true;
+	}
+
+	/**
 	 * Checks the DB structure is up to date, rewrite rules, 
 	 * theme image size options are set, etc.
 	 *
@@ -501,5 +608,4 @@ class CFTP_Magnificent {
 
 // Initiate the singleton
 CFTP_Magnificent::init();
-
 
