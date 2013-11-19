@@ -271,6 +271,8 @@ class CFTP_Magnificent {
 	 **/
 	public function filter_posts_clauses( $clauses, WP_Query $query ) {
 		global $wpdb;
+		if ( is_admin() )
+			return $clauses;
 		if ( 'article' == $query->get( 'post_type' ) ) {
 
 			$parent_issue_name = $query->get( 'parent_issue_name' );
