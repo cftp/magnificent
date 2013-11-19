@@ -4,6 +4,9 @@
 	"homepage"   : "https://github.com/cftp/magnificent/",
 	"type"       : "wordpress-plugin",
 	"license"    : "GPL-2.0+",
+	"repositories": [
+		{ "type": "composer", "url": "http://wpackagist.org" }
+	],
 	"authors"    : [
 		{
 			"name"    : "Code For The People Ltd",
