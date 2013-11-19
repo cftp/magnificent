@@ -99,7 +99,7 @@ class CFTP_Magnificent {
 		add_action( 'init', array( $this, 'action_init' ) );
 		add_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
 
-		$this->version = 3;
+		$this->version = 4;
 
 		if ( ! is_a( $GLOBALS['wp_rewrite'], 'WP_Rewrite' ) )
 			$GLOBALS['wp_rewrite'] = new WP_Rewrite();
@@ -862,7 +862,7 @@ class CFTP_Magnificent {
 		if ( $version == $this->version )
 			return;
 
-		if ( $version < 3 ) {
+		if ( $version < 4 ) {
 			flush_rewrite_rules();
 			error_log( "CFTP Magnificent: Flush rewrite rules" );
 		}
