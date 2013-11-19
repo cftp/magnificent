@@ -198,22 +198,14 @@ class CFTP_Magnificent {
 	 * @author Simon Wheatley
 	 **/
 	public function action_save_post( $post_id, $post ) {
+		// @TODO: You shouldn't be able to publish an article with no issue
+		// @TODO: You shouldn't be able to publish an issue with no publication, if publications are enabled
 		if ( $this->recursing )
 			return;
 		$this->recursing = true;
-		// Get any connected issue and set it as the article post_parent
-		$issues = new WP_Query( array(
-			'connected_type' => 'issue_to_article',
-			'connected_items' => $post->ID,
-			'posts_per_page' => 1,
-		) );
-		if ( $issues->have_posts() ) {
-			$post_data = array(
-				'ID'          => $post_id,
-				'post_parent' => $issues->posts[ 0 ]->ID,
-			);
-			wp_update_post( $post_data );
-		}
+		$this->process_article_relationships( $post );
+		$this->process_issue_relationships( $post );
+		$this->process_publication_relationships( $post );
 		$this->recursing = false;
 	}
 
@@ -317,7 +309,8 @@ class CFTP_Magnificent {
 	 * @author Simon Wheatley
 	 **/
 	public function action_p2p_created_connection( $p2p_id ) {
-		// @TODO: Set post_parent for any articles
+		
+		$this->process_connection_change( $p2p_id );
 	}
 
 	/**
@@ -330,7 +323,8 @@ class CFTP_Magnificent {
 	 * @author Simon Wheatley
 	 **/
 	public function action_p2p_delete_connections( $p2p_ids ) {
-		// @TODO: Remove post_parent for any now orphaned articles
+		foreach ( $p2p_ids as $p2p_id )
+			$this->process_connection_change( $p2p_id );
 	}
 
 	// CALLBACKS
@@ -353,6 +347,138 @@ class CFTP_Magnificent {
 	/**
 	 * 
 	 *
+	 * @param int $p2p_id The Posts 2 Posts Connection ID
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function process_connection_change( $p2p_id ) {
+		if ( $this->recursing )
+			return;
+
+		$connection = p2p_get_connection( $p2p_id );
+		$post = get_post( $connection->p2p_from );
+
+		$this->recursing = true;
+		$this->process_article_relationships( $post );
+		$this->process_issue_relationships( $post );
+		$this->process_publication_relationships( $post );
+		$this->recursing = false;
+	}
+
+	/**
+	 * Process the data for an article on save.
+	 *
+	 * @param object $post A WP_Post object
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function process_article_relationships( WP_Post $article ) {
+		if ( 'article' != $article->post_type )
+			return;
+
+		// @FIXME: This is near duplicate code with the $publications search and set in process_issue_save
+		// Get any connected issue and set it 
+		// as the article post_parent
+		$issue = new WP_Query( array(
+			'connected_type'  => 'issue_to_article',
+			'connected_items' => $article->ID,
+			'fields'          => 'ids',
+			'posts_per_page'  => 1,
+		) );
+		if ( $issue->posts ) {
+			foreach ( $issue->posts as $issue_post_id ) {
+				$article_post_data = array(
+					'ID'          => $article->ID,
+					'post_parent' => $issue_post_id,
+				);
+				wp_update_post( $article_post_data );
+			}
+		}
+
+	}
+
+	/**
+	 * Process the data for an issue on save.
+	 *
+	 * @param object $post A WP_Post object
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function process_issue_relationships( WP_Post $issue ) {
+		if ( 'issue' != $issue->post_type )
+			return;
+
+		// @FIXME: This is near duplicate code with the $issues search and set in process_publication_save
+		// Get any connected article and set the article parent
+		// to the issue.
+		$articles = new WP_Query( array(
+			'connected_type'  => 'issue_to_article',
+			'connected_items' => $issue->ID,
+			'fields'          => 'ids',
+			'nopaging'        => true,
+		) );
+		if ( $articles->posts ) {
+			foreach ( $articles->posts as $article_post_id ) {
+				$article_post_data = array(
+					'ID'          => $article_post_id,
+					'post_parent' => $issue->ID,
+				);
+				wp_update_post( $article_post_data );
+			}
+		}
+
+		// Get any connected publication and set it 
+		// as the issue post_parent
+		// N.B. Publications might not be enabled, in which
+		// case this query returns nothing.
+		$publications = new WP_Query( array(
+			'connected_type' => 'publication_to_issue',
+			'connected_items' => $issue->ID,
+			'fields'          => 'ids',
+			'posts_per_page'  => 1,
+		) );
+		if ( $publications->posts ) {
+			foreach ( $publications->posts as $publication_post_id ) {
+				$issue_post_data = array(
+					'ID'          => $issue->ID,
+					'post_parent' => $publication_post_id,
+				);
+				wp_update_post( $issue_post_data );
+			}
+		}
+
+	}
+
+	/**
+	 * Process the data for a publication on save.
+	 *
+	 * @param object $post A WP_Post object
+	 * @return void
+	 * @author Simon Wheatley
+	 **/
+	public function process_publication_relationships( WP_Post $publication ) {
+		if ( 'publication' != $publication->post_type )
+			return;
+
+		// Get any connected issues and set this publication
+		// as the issue post_parent
+		$issues = new WP_Query( array(
+			'connected_type'  => 'publication_to_issue',
+			'connected_items' => $publication->ID,
+			'fields'          => 'ids',
+			'nopaging'        => true,
+		) );
+		if ( $issues->posts ) {
+			foreach ( $issues->posts as $issue_post_id ) {
+				$issue_post_data = array(
+					'ID'          => $issue_post_id,
+					'post_parent' => $publication->ID,
+				);
+				wp_update_post( $issue_post_data );
+			}
+		}
+	}
+
 	 *
 	 * @return void
 	 * @author Simon Wheatley
