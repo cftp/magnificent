@@ -257,7 +257,7 @@ class CFTP_Magnificent {
 	 * @author Simon Wheatley
 	 **/
 	public function filter_query_vars( $query_vars ) {
-		return array_merge( $query_vars, array( 'post_parent_name' ) );
+		return array_merge( $query_vars, array( 'parent_issue_name', 'parent_publication_name' ) );
 	}
 
 	/**
@@ -269,12 +269,16 @@ class CFTP_Magnificent {
 	 * @return array An array of SQL clauses from WP_Query
 	 * @author Simon Wheatley
 	 **/
-	public function filter_posts_clauses( $clauses, $query ) {
+	public function filter_posts_clauses( $clauses, WP_Query $query ) {
 		global $wpdb;
-		if ( ! $post_parent_name = $query->get( 'post_parent_name' ) )
-			return $clauses;
-		$sql = " AND $wpdb->posts.post_parent IN ( SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'issue' AND post_status = 'publish' ) ";
-		$clauses[ 'where' ] .= $wpdb->prepare( $sql, $post_parent_name );
+		if ( $parent_issue_name = $query->get( 'parent_issue_name' ) ) {
+			$sql = " AND $wpdb->posts.post_parent IN ( SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'issue' AND post_status = 'publish' ) ";
+			$clauses[ 'where' ] .= $wpdb->prepare( $sql, $parent_issue_name );
+		}
+		if ( $parent_publication_name = $query->get( 'parent_publication_name' ) ) {
+			$sql = " AND $wpdb->posts.post_parent IN ( SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'publication' AND post_status = 'publish' ) ";
+			$clauses[ 'where' ] .= $wpdb->prepare( $sql, $parent_publication_name );
+		}
 		return $clauses;
 	}
 
@@ -346,7 +350,7 @@ class CFTP_Magnificent {
 			$issue = get_post( $article->post_parent );
 			if ( $this->are_publications_enabled() ) {
 				$publication = get_post( $issue->post_parent );
-				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}publications/%publication%/%issue%/%article%/";
+				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}publication/%publication%/%issue%/%article%/";
 				$search  = array( '%publication%', '%issue%', '%article%' );
 				$replace = array( $publication->post_name, $issue->post_name, $article->post_name );
 			} else {
@@ -371,7 +375,7 @@ class CFTP_Magnificent {
 		if ( $issue->post_parent ) {
 			if ( $this->are_publications_enabled() ) {
 				$publication = get_post( $issue->post_parent );
-				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}publications/%publication%/%issue%/";
+				$permalink_structure = "/{$GLOBALS['wp_rewrite']->root}publication/%publication%/%issue%/";
 				$search  = array( '%publication%', '%issue%' );
 				$replace = array( $publication->post_name, $issue->post_name );
 			} else {
@@ -607,12 +611,6 @@ class CFTP_Magnificent {
 			'rewrite' => false,
 		) );
 
-		// Rewrite rules for articles
-		if ( $this->are_publications_enabled() )
-			add_rewrite_rule( 'publication/([^/]+)/([^/]+)/([^/]+)', 'index.php?publication_name=$matches[1]&post_parent_name=$matches[2]&article=$matches[3]', 'top' );
-		else
-			add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_parent_name=$matches[1]&article=$matches[2]', 'top' );
-
 		if ( $this->are_publications_enabled() ) {
 
 			$publication = register_extended_post_type( 'publication', array(
@@ -660,6 +658,18 @@ class CFTP_Magnificent {
 			) );
 
 		}
+
+		// Rewrite rules for articles
+		if ( $this->are_publications_enabled() )
+			add_rewrite_rule( 'publication/([^/]+)/([^/]+)/([^/]+)', 'index.php?post_type=article&parent_issue_name=$matches[2]&article=$matches[3]', 'top' );
+		else
+			add_rewrite_rule( 'issue/([^/]+)/([^/]+)', 'index.php?post_type=article&parent_issue_name=$matches[1]&article=$matches[2]', 'top' );
+
+		// Rewrite rules for issues
+		if ( $this->are_publications_enabled() )
+			add_rewrite_rule( 'publication/([^/]+)/([^/]+)', 'index.php?post_type=issue&parent_publication_name=$matches[1]&issue=$matches[2]', 'top' );
+		else
+			add_rewrite_rule( 'issue/([^/]+)', 'index.php?post_type=issue&issue=$matches[1]', 'top' );
 
 		$article_type = register_extended_taxonomy( 'article_type', 'article', array(
 			'meta_box' => 'radio',
